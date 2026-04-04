@@ -27,10 +27,8 @@ const width = window.innerWidth;
 const height = window.innerHeight;
 const camera = new THREE.PerspectiveCamera(40, width/height, 0.1, 1000);
 
-const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,
+const renderer = new THREE.WebGLRenderer({
     powerPrefrence: "high-performance",
-    alpha: false,
 });
 
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -38,13 +36,14 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(width, height);
 document.body.appendChild(renderer.domElement);
 
 const composer = new EffectComposer(renderer);
 
-const ssaoPass = new SSAOPass(scene, camera, width, height);
-ssaoPass.kernelRadius = 16;
+const ssaoPass = new SSAOPass(scene, camera, width/2, height/2);
+ssaoPass.kernelRadius = 2;
 ssaoPass.minDistance = 0.001;
 ssaoPass.maxDistance = 0.1;
 
@@ -55,7 +54,7 @@ contrastPass.uniforms['brightness'].value = 0.0;
 const resolution = new THREE.Vector2(width, height);
 const outlinePass = new OutlinePass(resolution, scene, camera);
 outlinePass.edgeStrength = 5;
-outlinePass.edgeThickness = 4;
+outlinePass.edgeThickness = 1;
 outlinePass.visibleEdgeColor.set('#FFFFFF');
 outlinePass.hiddenEdgeColor.set('#FFFFFF');
 
@@ -69,6 +68,7 @@ composer.addPass(renderPass);
 composer.addPass(ssaoPass);
 composer.addPass(contrastPass);
 composer.addPass(outlinePass);
+composer.addPass(fxaaPass);
 composer.addPass(outputPass);
 
 // HTML Overlay
@@ -110,13 +110,14 @@ backButton.addEventListener('click', () => {
 });
 
 // HDR
-new HDRLoader().load('/hdri/park.hdr', (texture) => {
+new HDRLoader().load('/hdri/studio.hdr', (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
     scene.environmentIntensity = 1.0;
     // scene.background = texture;
     scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
+
 
 const gltfLoader = new GLTFLoader();
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
@@ -132,17 +133,17 @@ gltfLoader.load('/models/room.glb', (gltf) => {
         }
 
         if (child.isSpotLight || child.isPointLight) {
-            child.intensity = 0;
+            // child.intensity = child.intensity/50;
             // child.castShadow = true;
             // child.shadow.mapSize.set(1024, 1024);
             // child.shadow.bias = -0.001;
         }
 
         if (child.isDirectionalLight) {
-            child.intensity = child.intensity / 15;
+            child.intensity = 1;
             child.castShadow = true;
-            child.shadow.mapSize.set(1024, 1024);
-            child.shadow.bias = -0.0001;
+            child.shadow.mapSize.set(512, 512);
+            child.shadow.bias = -0.001;
         }
 
         if (child.isCamera) {
@@ -180,6 +181,14 @@ window.addEventListener('click', () => {
     };
 });
 
+let fpsContainer = document.getElementById("fps");
+const timer = new THREE.Timer();
+
+let frameCount = 0;
+let elapsedTime = 0;
+let lastRaycast = 0;
+let intersects;
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -203,8 +212,12 @@ function animate() {
 
     if (!model) return;
 
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(model.children, true);
+    const now = performance.now();
+    if (now - lastRaycast > 100) { // every 100ms
+        raycaster.setFromCamera(mouse, camera);
+        intersects = raycaster.intersectObjects(model.children, true);
+        lastRaycast = now;
+    }
 
     if (intersects.length > 0) {
         let obj = intersects[0].object;
