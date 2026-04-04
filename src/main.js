@@ -179,6 +179,24 @@ window.addEventListener('click', () => {
 function animate() {
     requestAnimationFrame(animate);
 
+    {
+        timer.update();
+        const delta = timer.getDelta();
+
+        frameCount++;
+        elapsedTime += delta;
+
+        if (elapsedTime >= 1) {
+            const fps = frameCount / elapsedTime;
+
+            fpsContainer.innerText = `${fps.toFixed(0)} FPS`;
+            fpsContainer.style.color = fps < 40 ? "red" : "green";
+
+            frameCount = 0;
+            elapsedTime = 0;
+        }
+    }
+
     if (!model) return;
 
     raycaster.setFromCamera(mouse, camera);
