@@ -269,3 +269,47 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
 });
+
+
+window.addEventListener('beforeunload', cleanup);
+function cleanup() {
+    cancelAnimationFrame(animationId);
+
+    disposeScene(scene);
+
+    composer.dispose();
+    ssaoPass.dispose();
+    fxaaPass.dispose();
+    outlinePass.dispose();
+    contrastPass.dispose();
+
+    renderer.dispose();
+    renderer.forceContextLoss();
+
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('click', onClick);
+    window.removeEventListener('resize', onResize);
+}
+function disposeScene(scene) {
+    scene.traverse((obj) => {
+        if (obj.isMesh) {
+            obj.geometry?.dispose();
+
+            if (Array.isArray(obj.material)) {
+                obj.material.forEach(mat => disposeMaterial(mat));
+            } else {
+                disposeMaterial(obj.material);
+            }
+        }
+    });
+}
+
+function disposeMaterial(material) {
+    for (const key in material) {
+        const value = material[key];
+        if (value && value.isTexture) {
+            value.dispose();
+        }
+    }
+    material.dispose();
+}
