@@ -12,6 +12,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+
 
 let base_camera = null;
 let model = null;
@@ -59,6 +61,8 @@ outlinePass.hiddenEdgeColor.set('#FFFFFF');
 
 const renderPass = new RenderPass(scene, camera);
 const outputPass = new OutputPass();
+
+const fxaaPass = new ShaderPass(FXAAShader);
 
 // postprocessing passes
 composer.addPass(renderPass);
