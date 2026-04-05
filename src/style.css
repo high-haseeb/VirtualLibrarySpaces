@@ -15,8 +15,8 @@ html, body {
 
 #fps {
     position: absolute;
-    top: 1rem; right: 1rem;
-    font-size: 2rem;
+    top: 3rem; right: 1rem;
+    font-size: 1.5rem;
     font-family: monospace;
     font-weight: bold;
     z-index: 10;
@@ -40,20 +40,9 @@ canvas {
 	display: block;
 }
 
-.title {
-    position : absolute;
-    bottom : 20px;
-    left : 20px;
-    font-size : 4rem;
-    font-weight : bold;
-    color : #fff;
-    font-family : sans-serif;
-    pointer-events : none;
-}
-
 #view-back {
     position: absolute;
-    top: 2rem; left: 2rem;
+    top: 4rem; left: 2rem;
     z-index: 10;
     background: #00000044;
     display: flex;
@@ -76,12 +65,13 @@ canvas {
     height: 80vh;
     transform: translate(0%, 0%);
     opacity: 0;
-    transition: opacity 100ms linear;
+    transition: opacity 200ms linear;
     z-index: 999;
     background: #FFFFFFCC;
     backdrop-filter: blur(4px);
     outline: solid #44444422 4px;
     border-radius: 1rem;
+    pointer-events: none;
 }
 
 .catalog-container {
@@ -147,4 +137,100 @@ canvas {
     font-size: 0.85rem;
     color: #666;
     margin: 0;
+}
+
+.header {
+    position: absolute;
+    top: 0; left: 0;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 3rem;
+    height: max-content;
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: center;
+    justify-content: space-between;
+    z-index: 200;
+    color: black;
+    padding: 0.3rem 2rem;
+    background: rgb(100% 100% 100% /40%);
+    backdrop-filter: blur(8px);
+}
+
+.header-logo {
+    font-size: 1.4rem;
+    font-weight: bold;
+    letter-spacing: -2px;
+    color: rgb(20% 20% 20%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+}
+.header-search {
+    box-sizing: border-box;
+    max-height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 1rem;
+    border-radius: 0.5rem;
+    background-color: rgb(100% 100% 100% /40%);
+    box-shadow: rgb(0 0 0 /10%) 4px 4px;
+    outline: solid rgb(5% 5% 5% /20%) 1px;
+    color: rgb(5% 5% 5% /80%);
+}
+.header-search>input {
+    all: unset;
+    width: 100%;
+}
+
+.header-profile {
+    margin-left: auto;
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: rgb(100% 100% 100% /40%);
+    box-shadow: rgb(0 0 0 /10%) 4px 4px;
+    outline: solid rgb(5% 5% 5% /20%) 1px;
+    color: rgb(5% 5% 5% /80%);
+    border-radius: 50%;
+}
+
+#hover-help-box {
+    position: absolute;
+    top: 0; left: 0;
+    width: auto; height: auto;
+    max-width: 20rem;
+
+    background-color: rgb(100% 100% 100% /60%);
+    box-shadow: rgb(0 0 0 /10%) 4px 4px;
+    outline: solid rgb(5% 5% 5% /20%) 1px;
+    color: rgb(5% 5% 5% /80%);
+    backdrop-filter: blur(4px);
+    border-radius: 0.5rem;
+    padding: 1rem 1rem;
+
+    transition: opacity 150ms ease-in;
+    z-index: 999;
+    transform: translate(-50%, -100%);
+    user-select: none;
+    pointer-events: none;
+}
+#hover-help-name {
+    font-size: 2rem;
+    letter-spacing: -2px;
+    color: white;
+    text-shadow: black 1px 1px;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+#hover-help-desc {
+    color: #444;
+    font-size: 0.8rem;
 }
