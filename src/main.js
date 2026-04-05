@@ -14,7 +14,6 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 
-
 let base_camera = null;
 let model = null;
 let activeCameraTarget = null;
@@ -74,30 +73,20 @@ composer.addPass(fxaaPass);
 composer.addPass(outputPass);
 
 // HTML Overlay
-let currentTitle = '';
-const title = document.createElement('div');
-title.classList.add('title');
-document.body.appendChild(title);
+const helpEl = document.getElementById("hover-help-box");
+const helpElTitle = document.getElementById("hover-help-name");
 
-function showTitle(text) {
-    if (currentTitle === text) return;
+function showHelp(message) {
 
-    currentTitle = text;
+    helpEl.style.left = ((mouse.x+1)/2)*window.innerWidth  + 'px';
+    helpEl.style.top = (1.0 - (mouse.y+1)/2)*window.innerHeight + 'px';
 
-    title.style.opacity = '0';
-    title.style.transform = 'translateY(20px)';
-
-    setTimeout(() => {
-        title.textContent = text;
-        title.style.opacity = '1';
-        title.style.transform = 'translateY(0)';
-    }, 150);
+    helpElTitle.innerText = message;
+    helpEl.style.opacity = '1';
 }
 
-function hideTitle() {
-    currentTitle = '';
-    title.style.opacity = '0';
-    title.style.transform = 'translateY(20px)';
+function hideHelp() {
+    helpEl.style.opacity = '0';
 }
 
 const backButton = document.getElementById("view-back");
@@ -113,19 +102,16 @@ backButton.addEventListener('click', () => {
     };
 });
 
-function addDirectionalLight(scene, {
-    color = 0xffffff,
-    intensity = 1,
-    position = { x: 5, y: 10, z: 5 }
-} = {}) {
+function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
+                             position = { x: 5, y: 10, z: 5 } } = {}) {
 
     const light = new THREE.DirectionalLight(color, intensity);
 
     light.position.set(position.x, position.y, position.z);
     light.castShadow = true;
-    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.mapSize.set(512, 512);
 
-    const d = 20;
+    const d = 10;
     light.shadow.camera.left = -d;
     light.shadow.camera.right = d;
     light.shadow.camera.top = d;
@@ -142,48 +128,57 @@ function addDirectionalLight(scene, {
 addDirectionalLight(scene, { color: "white", intensity: 4, position: { x: 2, y: 7, z: 8 } });
 addDirectionalLight(scene, { color: "white", intensity: 5, position: { x: -5, y: 8, z: -2 } });
 
-// HDR
-new HDRLoader().load('/hdri/park.hdr', (texture) => {
+const HdrPath = '/hdri/park.hdr';
+new HDRLoader().load(HdrPath, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
     scene.environmentIntensity = 0.8;
     // scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
 
-
 const gltfLoader = new GLTFLoader();
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-gltfLoader.load('/models/room.glb', (gltf) => {
+const ModelPath = '/models/room.glb';
+gltfLoader.load(ModelPath, (gltf) => {
     model = gltf.scene;
     scene.add(model);
 
     model.traverse((child) => {
-        if (child.isMesh) {
+
+        if (child.isMesh) 
+        {
             child.castShadow = true;
             child.receiveShadow = true;
         }
 
-        if (child.isSpotLight || child.isPointLight) {
+        if (child.isSpotLight || child.isPointLight) 
+        {
+            child.intensity = 0;
             // child.intensity = child.intensity/50;
             // child.castShadow = true;
             // child.shadow.mapSize.set(1024, 1024);
             // child.shadow.bias = -0.001;
         }
 
-        if (child.isDirectionalLight) {
+        if (child.isDirectionalLight) 
+        {
             child.intensity = 0;
             // child.castShadow = true;
             // child.shadow.mapSize.set(512, 512);
             // child.shadow.bias = -0.001;
         }
 
-        if (child.isCamera) {
-            if (child.name === 'Base_Camera') {
+        if (child.isCamera) 
+        {
+            if (child.name === 'Base_Camera') 
+            {
                 base_camera = child;
                 camera.position.copy(base_camera.position);
                 camera.quaternion.copy(base_camera.quaternion);
-            } else if (child.name.endsWith('_Camera')) {
+            } 
+            else if (child.name.endsWith('_Camera')) 
+            {
                 const meshName = child.name.replace('_Camera', '');
                 cameraMap[meshName] = child;
             }
@@ -191,7 +186,6 @@ gltfLoader.load('/models/room.glb', (gltf) => {
     });
 });
 
-// Raycasting
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -222,10 +216,12 @@ let elapsedTime = 0;
 let lastRaycast = 0;
 let intersects;
 
+const movementTime = 3; // seconds
+
 function animate() {
     requestAnimationFrame(animate);
 
-    {
+    { // FPS
         timer.update();
         const delta = timer.getDelta();
 
@@ -263,17 +259,18 @@ function animate() {
             hoveredObject = obj;
 
             outlinePass.selectedObjects = [obj];
-            showTitle(obj.name);
+            showHelp(obj.name);
+            document.body.style.cursor = 'pointer';
         } else {
+            document.body.style.cursor = 'auto';
             clearHover();
         }
     } else {
         clearHover();
     }
 
-    // Camera transition
     if (activeCameraTarget) {
-        activeCameraTarget.progress += 0.02;
+        activeCameraTarget.progress += timer.getDelta() * 1/movementTime;
 
         camera.position.lerp(
             activeCameraTarget.position,
@@ -285,9 +282,16 @@ function animate() {
             activeCameraTarget.progress
         );
 
-        if (activeCameraTarget.progress >= 0.5) catalogEl.style.opacity = activeCameraTarget.opacity;
-
         if (activeCameraTarget.progress >= 1) {
+
+            catalogEl.style.opacity = activeCameraTarget.opacity;
+
+            if (activeCameraTarget.opacity != '0') {
+                catalogEl.style.pointerEvents = 'auto';
+            } else {
+                catalogEl.style.pointerEvents = 'none';
+            }
+
             activeCameraTarget = null;
         }
     }
@@ -305,7 +309,7 @@ function animate() {
 function clearHover() {
     hoveredObject = null;
     outlinePass.selectedObjects = [];
-    hideTitle();
+    hideHelp();
 }
 
 animate();
