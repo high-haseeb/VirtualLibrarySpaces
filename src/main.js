@@ -50,7 +50,7 @@ ssaoPass.minDistance = 0.001;
 ssaoPass.maxDistance = 0.1;
 
 const contrastPass = new ShaderPass(BrightnessContrastShader);
-contrastPass.uniforms['contrast'].value = 0.08;
+contrastPass.uniforms['contrast'].value = 0.06;
 contrastPass.uniforms['brightness'].value = 0.0;
 
 const resolution = new THREE.Vector2(width, height);
@@ -67,8 +67,8 @@ const fxaaPass = new ShaderPass(FXAAShader);
 
 // postprocessing passes
 composer.addPass(renderPass);
-composer.addPass(ssaoPass);
 composer.addPass(contrastPass);
+composer.addPass(ssaoPass);
 composer.addPass(outlinePass);
 composer.addPass(fxaaPass);
 composer.addPass(outputPass);
@@ -113,13 +113,41 @@ backButton.addEventListener('click', () => {
     };
 });
 
+function addDirectionalLight(scene, {
+    color = 0xffffff,
+    intensity = 1,
+    position = { x: 5, y: 10, z: 5 }
+} = {}) {
+
+    const light = new THREE.DirectionalLight(color, intensity);
+
+    light.position.set(position.x, position.y, position.z);
+    light.castShadow = true;
+    light.shadow.mapSize.set(1024, 1024);
+
+    const d = 20;
+    light.shadow.camera.left = -d;
+    light.shadow.camera.right = d;
+    light.shadow.camera.top = d;
+    light.shadow.camera.bottom = -d;
+
+    light.shadow.camera.near = 0.5;
+    light.shadow.camera.far = 50;
+
+    light.shadow.bias = -0.001;
+    scene.add(light);
+    return light;
+}
+
+addDirectionalLight(scene, { color: "white", intensity: 4, position: { x: 2, y: 7, z: 8 } });
+addDirectionalLight(scene, { color: "white", intensity: 5, position: { x: -5, y: 8, z: -2 } });
+
 // HDR
-new HDRLoader().load('/hdri/studio.hdr', (texture) => {
+new HDRLoader().load('/hdri/park.hdr', (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
-    scene.environmentIntensity = 1.0;
-    // scene.background = texture;
-    scene.backgroundRotation.set(0, Math.PI / 2, 0); 
+    scene.environmentIntensity = 0.8;
+    // scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
 
 
@@ -144,10 +172,10 @@ gltfLoader.load('/models/room.glb', (gltf) => {
         }
 
         if (child.isDirectionalLight) {
-            child.intensity = 1;
-            child.castShadow = true;
-            child.shadow.mapSize.set(512, 512);
-            child.shadow.bias = -0.001;
+            child.intensity = 0;
+            // child.castShadow = true;
+            // child.shadow.mapSize.set(512, 512);
+            // child.shadow.bias = -0.001;
         }
 
         if (child.isCamera) {
@@ -269,7 +297,7 @@ function animate() {
         // currentRotY += (targetRotY - currentRotY) * 0.08;
         // camera.rotation.x = baseRotation.x + currentRotX;
         // camera.rotation.y = baseRotation.y - currentRotY;
-    // }
+        // }
 
     composer.render();
 }
