@@ -10,6 +10,7 @@ html, body {
 	overflow: hidden;
 	color: var(--color-fg);
 	background: var(--color-bg);
+    font-family: -apple-system;
 }
 
 #fps {
@@ -52,6 +53,98 @@ canvas {
 
 #view-back {
     position: absolute;
-    top: 1rem; left: 1rem;
+    top: 2rem; left: 2rem;
     z-index: 10;
+    background: #00000044;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: 4px;
+    transition: transform 100ms ease-out, color 100ms ease-out;
+    cursor: pointer;
+}
+#view-back:hover {
+    transform: scale(1.2);
+    background: #00000088;
+}
+
+#catalog-overlay {
+    position: absolute;
+    top: 10vh; left: 10vw;
+    width: 80vw;
+    height: 80vh;
+    transform: translate(0%, 0%);
+    opacity: 0;
+    transition: opacity 100ms linear;
+    z-index: 999;
+    background: #FFFFFFCC;
+    backdrop-filter: blur(4px);
+    outline: solid #44444422 4px;
+    border-radius: 1rem;
+}
+
+.catalog-container {
+    padding: 2rem 3rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", sans-serif;
+}
+
+.catalog-title {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
+    color: #111;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2rem;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+/* Book Card */
+.book-card {
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 1rem;
+    text-align: center;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    cursor: pointer;
+}
+
+.book-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.book-card img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.book-card h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #111;
+    margin: 0.5rem 0 0.25rem;
+}
+
+.book-card p {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0;
 }

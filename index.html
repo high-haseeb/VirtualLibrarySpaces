@@ -10,8 +10,62 @@
 	<body>
 		<!-- <h1>Virtual Library Tour</h1> -->
         <div id="fps"></div>
-        <button id="view-back">Back</button>
-		<canvas id="game" width="100%" height="100%"/>
-		<script type="module" src="/src/main.js"></script>
-	</body>
+        <div id="catalog-overlay">
+            <div class="catalog-container">
+                <h1 class="catalog-title">Books</h1>
+
+                <div class="catalog-grid">
+
+                    <div class="book-card">
+                        <img src="/images/book-1.webp" alt="Book 1">
+                        <h3>The Silent Code</h3>
+                        <p>by A. Writer</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-2.webp" alt="Book 2">
+                        <h3>Design & Mind</h3>
+                        <p>by J. Creative</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-3.webp" alt="Book 3">
+                        <h3>Future Systems</h3>
+                        <p>by K. Engineer</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-5.webp" alt="Book 1">
+                        <h3>The Silent Code</h3>
+                        <p>by A. Writer</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-6.webp" alt="Book 2">
+                        <h3>Design & Mind</h3>
+                        <p>by J. Creative</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-7.webp" alt="Book 3">
+                        <h3>Future Systems</h3>
+                        <p>by K. Engineer</p>
+                    </div>
+
+                    <div class="book-card">
+                        <img src="/images/book-8.webp" alt="Book 4">
+                        <h3>Minimal Thinking</h3>
+                        <p>by L. Zen</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div id="view-back">
+            <img src="/icons/arrow-back.png" width="48" height="48"></img>
+        </div>
+        <canvas id="game" width="100%" height="100%"/>
+            <script type="module" src="/src/main.js"></script>
+    </body>
 </html>
