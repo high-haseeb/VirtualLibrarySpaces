@@ -27,8 +27,11 @@ const width = window.innerWidth;
 const height = window.innerHeight;
 const camera = new THREE.PerspectiveCamera(40, width/height, 0.1, 1000);
 
+const catalogEl = document.getElementById("catalog-overlay");
+
 const renderer = new THREE.WebGLRenderer({
     powerPrefrence: "high-performance",
+    canvas: document.getElementById("game"),
 });
 
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -38,7 +41,6 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(width, height);
-document.body.appendChild(renderer.domElement);
 
 const composer = new EffectComposer(renderer);
 
@@ -102,10 +104,12 @@ const backButton = document.getElementById("view-back");
 backButton.addEventListener('click', () => {
     if (!model) return;
 
+    catalogEl.style.opacity = '0';
     activeCameraTarget = {
         position: base_camera.position.clone(),
         quaternion: base_camera.quaternion.clone(),
-        progress: 0
+        progress: 0,
+        opacity: '0',
     };
 });
 
@@ -177,7 +181,8 @@ window.addEventListener('click', () => {
     activeCameraTarget = {
         position: targetCam.position.clone(),
         quaternion: targetCam.quaternion.clone(),
-        progress: 0
+        progress: 0,
+        opacity: '1',
     };
 });
 
@@ -251,6 +256,8 @@ function animate() {
             activeCameraTarget.quaternion,
             activeCameraTarget.progress
         );
+
+        if (activeCameraTarget.progress >= 0.5) catalogEl.style.opacity = activeCameraTarget.opacity;
 
         if (activeCameraTarget.progress >= 1) {
             activeCameraTarget = null;
