@@ -412,15 +412,15 @@ function animate() {
                 activeCameraTarget = null;
                 enterRoom();
             } else {
+                catalogEl.style.opacity = activeCameraTarget.opacity;
+                if (activeCameraTarget.opacity != '0') {
+                    catalogEl.style.pointerEvents = 'auto';
+                } else {
+                    catalogEl.style.pointerEvents = 'none';
+                }
                 activeCameraTarget = null;
-                // catalogEl.style.opacity = activeCameraTarget.opacity;
             }
 
-            // if (activeCameraTarget.opacity != '0') {
-                //     catalogEl.style.pointerEvents = 'auto';
-                // } else {
-                    //     catalogEl.style.pointerEvents = 'none';
-                    // }
         }
     }
 
