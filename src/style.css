@@ -12,6 +12,12 @@ html, body {
 	background: var(--color-bg);
     font-family: -apple-system;
 }
+#game {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+} 
 
 #fps {
     position: absolute;
@@ -20,7 +26,51 @@ html, body {
     font-family: monospace;
     font-weight: bold;
     z-index: 10;
-    color: green;
+    color: blue;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(180deg);
+    }
+}
+
+#loading-screen {
+    box-sizing: border-box;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: black;
+    padding: 2rem;
+    transition: opacity 200ms ease-out;
+}
+.loading-title {
+    display: flex;
+    flex-direction: column;
+    font-size: 2rem;
+    align-items: center;
+    font-weight: bold;
+    letter-spacing: -2px;
+    text-align: center;
+    gap: 1rem;
+}
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+.loading-footer {
+    position: absolute;
+    bottom: 1rem; left: 50%;
+    transform: translate(-50%, 0);
 }
 
 h1 {
@@ -43,6 +93,7 @@ canvas {
 #view-back {
     position: absolute;
     top: 4rem; left: 2rem;
+    opacity: 0;
     z-index: 10;
     background: #00000044;
     display: flex;
@@ -72,6 +123,7 @@ canvas {
     outline: solid #44444422 4px;
     border-radius: 1rem;
     pointer-events: none;
+    user-select: none;
 }
 
 .catalog-container {
@@ -111,6 +163,7 @@ canvas {
     transition: transform 200ms ease, box-shadow 200ms ease;
     box-shadow: 0 4px 20px rgba(0,0,0,0.05);
     cursor: pointer;
+    pointer-events: none;
 }
 
 .book-card:hover {

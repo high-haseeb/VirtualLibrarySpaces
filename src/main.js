@@ -14,9 +14,15 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 
-let base_camera = null;
-let model = null;
+let activeModel = null;
+let hallModel = null;
+let roomModel = null;
+
 let activeCameraTarget = null;
+let hallToRoomCamera = null;
+let hallBaseCamera = null;
+let roomBaseCamera = null;
+let roomEnterCamera = null;
 let hoveredObject = null;
 const cameraMap = {};
 
@@ -29,6 +35,7 @@ const camera = new THREE.PerspectiveCamera(40, width/height, 0.1, 1000);
 const catalogEl = document.getElementById("catalog-overlay");
 
 const renderer = new THREE.WebGLRenderer({
+    antialias: true,
     powerPrefrence: "high-performance",
     canvas: document.getElementById("game"),
 });
@@ -69,7 +76,7 @@ composer.addPass(renderPass);
 composer.addPass(contrastPass);
 composer.addPass(ssaoPass);
 composer.addPass(outlinePass);
-composer.addPass(fxaaPass);
+// composer.addPass(fxaaPass);
 composer.addPass(outputPass);
 
 // HTML Overlay
@@ -90,16 +97,23 @@ function hideHelp() {
 }
 
 const backButton = document.getElementById("view-back");
+let cameraAtHome = true;
+
 backButton.addEventListener('click', () => {
-    if (!model) return;
+    if (!activeModel) return;
+
+    if (isInRoom && cameraAtHome) {
+        exitRoom();
+    }
 
     catalogEl.style.opacity = '0';
     activeCameraTarget = {
-        position: base_camera.position.clone(),
-        quaternion: base_camera.quaternion.clone(),
+        position: isInRoom ? roomBaseCamera.position.clone() : hallBaseCamera.position.clone(),
+        quaternion: isInRoom ? roomBaseCamera.quaternion.clone() : hallBaseCamera.quaternion.clone(),
         progress: 0,
         opacity: '0',
     };
+    cameraAtHome = true;
 });
 
 function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
@@ -128,23 +142,69 @@ function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
 addDirectionalLight(scene, { color: "white", intensity: 4, position: { x: 2, y: 7, z: 8 } });
 addDirectionalLight(scene, { color: "white", intensity: 5, position: { x: -5, y: 8, z: -2 } });
 
-const HdrPath = '/hdri/park.hdr';
-new HDRLoader().load(HdrPath, (texture) => {
+const HdrPath = '/hdri/park_1k.hdr';
+const HallModelPath = '/models/hall.glb';
+const RoomoModelPath = '/models/room.glb';
+
+const loadingManager = new THREE.LoadingManager();
+const loadingScreen = document.getElementById("loading-screen");
+
+const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+loadingManager.onLoad = () => {
+    loadingScreen.style.opacity = '0';
+
+    loader.load(RoomoModelPath, (glb) => {
+        roomModel = glb.scene;
+
+        roomModel.traverse((child) => {
+            if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+
+            if (child.isDirectionalLight) {
+                child.intensity = 0.5;
+                // child.castShadow = true;
+                // child.shadow.mapSize.set(512, 512);
+                // child.shadow.bias = -0.001;
+            }
+
+            if (child.isCamera) {
+                if (child.name === 'Base_Camera') {
+                    roomBaseCamera = child; 
+                } 
+                if (child.name === 'RoomEnterCamera') {
+                    roomEnterCamera = child;
+                }
+                else if (child.name.endsWith('_Camera')) {
+                    const meshName = child.name.replace('_Camera', '');
+                    cameraMap[meshName] = child;
+                }
+            }
+        });
+
+        if (isInRoom) enterRoom();
+    });
+};
+
+new HDRLoader(loadingManager).load(HdrPath, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
     scene.environmentIntensity = 0.8;
     // scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
 
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-const ModelPath = '/models/room.glb';
-gltfLoader.load(ModelPath, (gltf) => {
-    model = gltf.scene;
-    scene.add(model);
+gltfLoader.load(HallModelPath, (gltf) => {
+    hallModel = gltf.scene;
+    scene.add(hallModel);
+    activeModel = hallModel;
 
-    model.traverse((child) => {
+    hallModel.traverse((child) => {
 
         if (child.isMesh) 
         {
@@ -173,9 +233,9 @@ gltfLoader.load(ModelPath, (gltf) => {
         {
             if (child.name === 'Base_Camera') 
             {
-                base_camera = child;
-                camera.position.copy(base_camera.position);
-                camera.quaternion.copy(base_camera.quaternion);
+                hallBaseCamera = child;
+                camera.position.copy(hallBaseCamera.position);
+                camera.quaternion.copy(hallBaseCamera.quaternion);
             } 
             else if (child.name.endsWith('_Camera')) 
             {
@@ -206,7 +266,65 @@ window.addEventListener('click', () => {
         progress: 0,
         opacity: '1',
     };
+
+    if (isInRoom) cameraAtHome = false;
 });
+
+let isInRoom = false;
+let justExitedRoom = false;
+let roomModelLoaded = false;
+
+function enterRoom() {
+    isInRoom = true;
+    justExitedRoom = false;
+    backButton.style.opacity = '1';
+
+    if (!roomModel) {
+        loadingScreen.style.opacity = '1';
+        return;
+    }  
+
+    loadingScreen.style.opacity = '0';
+    activeModel = roomModel;
+
+    scene.add(roomModel);
+    scene.remove(hallModel);
+
+    camera.position.copy(roomEnterCamera.position);
+    camera.quaternion.copy(roomEnterCamera.quaternion);
+
+    activeCameraTarget = {
+        position: roomBaseCamera.position.clone(),
+        quaternion: roomBaseCamera.quaternion.clone(),
+        progress: 0,
+    }
+}
+
+function exitRoom() {
+    backButton.style.opacity = '0';
+    isInRoom = false;
+    justExitedRoom = true;
+
+    activeModel = hallModel;
+
+    scene.remove(roomModel);
+    scene.add(hallModel);
+
+    camera.position.copy(hallToRoomCamera.position);
+    camera.quaternion.copy(hallToRoomCamera.quaternion);
+    hallToRoomCamera = null;
+
+    activeCameraTarget = {
+        position: hallBaseCamera.position.clone(),
+        quaternion: hallBaseCamera.quaternion.clone(),
+        progress: 0,
+        opacity: '1',
+    };
+
+    setTimeout(() => {
+        justExitedRoom = false;
+    }, movementTime*1000*2);
+}
 
 let fpsContainer = document.getElementById("fps");
 const timer = new THREE.Timer();
@@ -216,7 +334,7 @@ let elapsedTime = 0;
 let lastRaycast = 0;
 let intersects;
 
-const movementTime = 3; // seconds
+const movementTime = 1; // seconds
 
 function animate() {
     requestAnimationFrame(animate);
@@ -239,12 +357,12 @@ function animate() {
         }
     }
 
-    if (!model) return;
+    if (!activeModel) return;
 
     const now = performance.now();
     if (now - lastRaycast > 100) { // every 100ms
         raycaster.setFromCamera(mouse, camera);
-        intersects = raycaster.intersectObjects(model.children, true);
+        intersects = raycaster.intersectObjects(activeModel.children, true);
         lastRaycast = now;
     }
 
@@ -284,24 +402,25 @@ function animate() {
 
         if (activeCameraTarget.progress >= 1) {
 
-            catalogEl.style.opacity = activeCameraTarget.opacity;
-
-            if (activeCameraTarget.opacity != '0') {
-                catalogEl.style.pointerEvents = 'auto';
+            if (!isInRoom && !justExitedRoom) {
+                hallToRoomCamera = { 
+                    position: activeCameraTarget.position.clone(),
+                    quaternion:  activeCameraTarget.quaternion.clone(), 
+                };
+                activeCameraTarget = null;
+                enterRoom();
             } else {
-                catalogEl.style.pointerEvents = 'none';
+                activeCameraTarget = null;
+                // catalogEl.style.opacity = activeCameraTarget.opacity;
             }
 
-            activeCameraTarget = null;
+            // if (activeCameraTarget.opacity != '0') {
+                //     catalogEl.style.pointerEvents = 'auto';
+                // } else {
+                    //     catalogEl.style.pointerEvents = 'none';
+                    // }
         }
     }
-
-    // if (!activeCameraTarget) {
-        // currentRotX += (targetRotX - currentRotX) * 0.08;
-        // currentRotY += (targetRotY - currentRotY) * 0.08;
-        // camera.rotation.x = baseRotation.x + currentRotX;
-        // camera.rotation.y = baseRotation.y - currentRotY;
-        // }
 
     composer.render();
 }
@@ -323,7 +442,7 @@ window.addEventListener('resize', () => {
 });
 
 
-window.addEventListener('beforeunload', cleanup);
+// window.addEventListener('beforeunload', cleanup);
 function cleanup() {
     cancelAnimationFrame(animationId);
 
