@@ -14,6 +14,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 
+
+const BASE = import.meta.env.BASE_URL;
 let activeModel = null;
 let hallModel = null;
 let roomModel = null;
@@ -142,9 +144,9 @@ function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
 addDirectionalLight(scene, { color: "white", intensity: 4, position: { x: 2, y: 7, z: 8 } });
 addDirectionalLight(scene, { color: "white", intensity: 5, position: { x: -5, y: 8, z: -2 } });
 
-const HdrPath = '/hdri/park_1k.hdr';
-const HallModelPath = '/models/hall.glb';
-const RoomoModelPath = '/models/room.glb';
+const HdrPath = `${BASE}/hdri/park_1k.hdr`;
+const HallModelPath = `${BASE}/models/hall.glb`;
+const RoomoModelPath = `${BASE}/models/room.glb`;
 
 const loadingManager = new THREE.LoadingManager();
 const loadingScreen = document.getElementById("loading-screen");
