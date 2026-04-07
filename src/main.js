@@ -494,6 +494,7 @@ const handleClick = () => {
                 onComplete: () => { 
                     showPopup(itemName);
                     state = States.ROOM_ITEM;
+                    cameraTarget = null;
                 }
             };
         } break;
