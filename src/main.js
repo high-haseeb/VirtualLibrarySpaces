@@ -57,6 +57,8 @@ const renderer = new THREE.WebGLRenderer({
     canvas: document.getElementById("game"),
 });
 
+// new OrbitControls(camera, renderer.domElement);
+
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
@@ -86,7 +88,7 @@ outlinePass.hiddenEdgeColor.set('#FFFFFF');
 const renderPass = new RenderPass(scene, camera);
 const outputPass = new OutputPass();
 
-const fxaaPass = new ShaderPass(FXAAShader);
+// const fxaaPass = new ShaderPass(FXAAShader);
 
 // postprocessing passes
 composer.addPass(renderPass);
@@ -133,14 +135,21 @@ backButton.addEventListener('click', () => {
     cameraAtHome = true;
 });
 
-function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
-                             position = { x: 5, y: 10, z: 5 } } = {}) {
+let lightHelper;
+function addDirectionalLight(scene, { 
+    color = 0xffffff,
+    intensity = 1,
+    position = { x: 0, y: 2, z: 0 },
+    target = { x: 0, y: 0, z: 0 }
+} = {}) {
 
     const light = new THREE.DirectionalLight(color, intensity);
 
     light.position.set(position.x, position.y, position.z);
+    light.target.position.set(target.x, target.y, target.z);
+
     light.castShadow = true;
-    light.shadow.mapSize.set(512, 512);
+    light.shadow.mapSize.set(1024, 1024);
 
     const d = 10;
     light.shadow.camera.left = -d;
@@ -153,11 +162,74 @@ function addDirectionalLight(scene, { color = 0xffffff, intensity = 1,
 
     light.shadow.bias = -0.001;
     scene.add(light);
+    scene.add(light.target);
+
+    // lightHelper = new THREE.DirectionalLightHelper(light, 1);
+    // scene.add(lightHelper);
+    // const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
+    // scene.add(shadowHelper);
+
     return light;
 }
 
-addDirectionalLight(scene, { color: "white", intensity: 4, position: { x: 2, y: 7, z: 8 } });
-addDirectionalLight(scene, { color: "white", intensity: 5, position: { x: -5, y: 8, z: -2 } });
+// create light
+
+// GUI
+// const gui = new GUI();
+//
+
+// const lightFolder = gui.addFolder('Directional Light');
+//
+// // position controls
+// const pos = light.position;
+// lightFolder.add(pos, 'x', -20, 20, 0.1).name('pos x');
+// lightFolder.add(pos, 'y', -20, 20, 0.1).name('pos y');
+// lightFolder.add(pos, 'z', -20, 20, 0.1).name('pos z');
+//
+// // target controls
+// const target = light.target.position;
+// lightFolder.add(target, 'x', -20, 20, 0.1).name('target x');
+// lightFolder.add(target, 'y', -20, 20, 0.1).name('target y');
+// lightFolder.add(target, 'z', -20, 20, 0.1).name('target z');
+//
+// // intensity
+// lightFolder.add(light, 'intensity', 0, 20, 0.1);
+//
+// // color
+// const params = { color: light.color.getHex() };
+// lightFolder.addColor(params, 'color').onChange(v => {
+//     light.color.set(v);
+// });
+//
+// lightFolder.open();
+
+import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+
+RectAreaLightUniformsLib.init();
+
+function addAreaLight(scene, {
+    color = 0xffffff,
+    intensity = 5,
+    width = 2,
+    height = 2,
+    position = { x: 0, y: 3, z: 0 },
+    rotation = { x: 0, y: 0, z: 0 }
+} = {}) {
+
+    const light = new THREE.RectAreaLight(color, intensity, width, height);
+
+    light.position.set(position.x, position.y, position.z);
+    light.rotation.set(rotation.x, rotation.y, rotation.z);
+
+    scene.add(light);
+
+    // helper (visual rectangle)
+    const helper = new RectAreaLightHelper(light);
+    light.add(helper); // attach so it moves with light
+
+    return { light, helper };
+}
 
 const HdrPath = `${BASE}/hdri/park_1k.hdr`;
 const HallModelPath = `${BASE}/models/hall.glb`;
@@ -174,18 +246,24 @@ loadingManager.onLoad = () => {
 
     loader.load(RoomoModelPath, (glb) => {
         roomModel = glb.scene;
+        addDirectionalLight(roomModel, { 
+            color: "white",
+            intensity: 5,
+            position: { x: -15, y: 6.7, z: 8 },
+            target: { x: -15, y: 0, z: 8 },
+        });
+        addDirectionalLight(roomModel, { 
+            color: "orange",
+            intensity: 8,
+            position: { x: -15, y: 6.7, z: 20 },
+            target: { x: -15, y: 0, z: 4.5 },
+        });
+
 
         roomModel.traverse((child) => {
             if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-
-            if (child.isDirectionalLight) {
-                child.intensity = 0.5;
-                // child.castShadow = true;
-                // child.shadow.mapSize.set(512, 512);
-                // child.shadow.bias = -0.001;
+                child.castShadow = true;
+                child.receiveShadow = true;
             }
 
             if (child.isCamera) {
@@ -216,7 +294,7 @@ loadingManager.onLoad = () => {
 new HDRLoader(loadingManager).load(HdrPath, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
-    scene.environmentIntensity = 0.8;
+    scene.environmentIntensity = 1.0;
     // scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
 
@@ -228,33 +306,35 @@ gltfLoader.load(HallModelPath, (gltf) => {
     scene.add(hallModel);
     activeModel = hallModel;
 
+    addDirectionalLight(hallModel, { 
+        color: "#c99c69",
+        intensity: 10,
+        position: { x: -4.6, y: 4.8, z: -12.4 },
+        target: { x: 0, y: -3.1, z: 11.2 },
+    });
+    addDirectionalLight(hallModel, {
+        color : 0xffffff,
+        intensity : 4,
+        position : { x: 0, y: 2, z: 0 },
+        target : { x: 0, y: 0, z: 0 }
+    });
+    addAreaLight(hallModel, {
+        color: 0xffffff,
+        intensity: 3,
+        width: 10,
+        height: 4,
+        position: { x: 0, y: 2.4, z: 4.5 },
+        rotation: {x: 0, y: 0, z: 0}
+    });
+
     hallModel.traverse((child) => {
 
-        if (child.isMesh) 
-        {
+        if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
         }
 
-        if (child.isSpotLight || child.isPointLight) 
-        {
-            child.intensity = 0;
-            // child.intensity = child.intensity/50;
-            // child.castShadow = true;
-            // child.shadow.mapSize.set(1024, 1024);
-            // child.shadow.bias = -0.001;
-        }
-
-        if (child.isDirectionalLight) 
-        {
-            child.intensity = 0;
-            // child.castShadow = true;
-            // child.shadow.mapSize.set(512, 512);
-            // child.shadow.bias = -0.001;
-        }
-
-        if (child.isCamera) 
-        {
+        if (child.isCamera) {
             if (child.name === 'Base_Camera') 
             {
                 hallBaseCamera = child;
@@ -295,6 +375,7 @@ window.addEventListener('click', () => {
         quaternion: targetCam.quaternion.clone(),
         progress: 0,
         opacity: '1',
+        name: hoveredObject.name,
     };
 
     if (isInRoom) cameraAtHome = false;
@@ -453,6 +534,8 @@ function animate() {
 
         }
     }
+
+    if (lightHelper) lightHelper.update();
 
     composer.render();
 }
