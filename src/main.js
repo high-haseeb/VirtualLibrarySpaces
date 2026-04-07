@@ -30,6 +30,19 @@ let roomEnterCamera = null;
 let hoveredObject = null;
 const cameraMap = {};
 
+const translationMap = { // german
+    "Library":  "Partheland-Bibliotheken",
+    "Library1": "Großpösna",
+    "Library2": "Naunhof",
+    "Library3": "Brandis ",
+    "Library4": "Borsdorf",
+    "Search":   "Suche",
+    "Catalog":  "Digitale Ausleihe",
+    "Profile":  "Mein Konto",
+    "Help":     "Chat & Hilfe",
+    "Community":   "Veranstaltungen",
+}
+
 const scene = new THREE.Scene();
 
 const width = window.innerWidth;
@@ -183,8 +196,15 @@ loadingManager.onLoad = () => {
                     roomEnterCamera = child;
                 }
                 else if (child.name.endsWith('_Camera')) {
-                    const meshName = child.name.replace('_Camera', '');
-                    cameraMap[meshName] = child;
+                    let meshName = child.name.replace('_Camera', '');
+                    const meshTranslation = translationMap[meshName];
+
+                    if (meshTranslation) {
+                        const obj = roomModel.getObjectByName(meshName);
+                        obj.name = meshTranslation;
+                    }
+
+                    cameraMap[meshTranslation] = child;
                 }
             }
         });
@@ -241,10 +261,16 @@ gltfLoader.load(HallModelPath, (gltf) => {
                 camera.position.copy(hallBaseCamera.position);
                 camera.quaternion.copy(hallBaseCamera.quaternion);
             } 
-            else if (child.name.endsWith('_Camera')) 
-            {
-                const meshName = child.name.replace('_Camera', '');
-                cameraMap[meshName] = child;
+            else if (child.name.endsWith('_Camera')) {
+                let meshName = child.name.replace('_Camera', '');
+                const meshTranslation = translationMap[meshName];
+
+                if (meshTranslation) {
+                    const obj = hallModel.getObjectByName(meshName);
+                    obj.name = meshTranslation;
+                }
+
+                cameraMap[meshTranslation] = child;
             }
         }
     });
@@ -414,11 +440,13 @@ function animate() {
                 activeCameraTarget = null;
                 enterRoom();
             } else {
-                catalogEl.style.opacity = activeCameraTarget.opacity;
-                if (activeCameraTarget.opacity != '0') {
-                    catalogEl.style.pointerEvents = 'auto';
-                } else {
-                    catalogEl.style.pointerEvents = 'none';
+                if (activeCameraTarget.name == translationMap['Catalog']) {
+                    catalogEl.style.opacity = activeCameraTarget.opacity;
+                    if (activeCameraTarget.opacity != '0') {
+                        catalogEl.style.pointerEvents = 'auto';
+                    } else {
+                        catalogEl.style.pointerEvents = 'none';
+                    }
                 }
                 activeCameraTarget = null;
             }
