@@ -4,31 +4,52 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
+import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-// import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-// import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
-// import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-// import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
-// import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
-
-// import GUI from "three/examples/jsm/libs/lil-gui.module.min.js"
-// import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const BASE = import.meta.env.BASE_URL;
+
+const HdrPath = `${BASE}/hdri/park_1k.hdr`;
+const HallModelPath = `${BASE}/models/hall.glb`;
+const RoomoModelPath = `${BASE}/models/room.glb`;
+
+const States = {
+    HALL_HOME: 0,
+    HALL_ITEM: 1,
+    ROOM_HOME: 2,
+    ROOM_ITEM: 3,
+};
+
+let state = States.HALL_HOME;
+
 let activeModel = null;
 let hallModel = null;
 let roomModel = null;
+let cameraTarget = null;
 
-let activeCameraTarget = null;
-let hallToRoomCamera = null;
 let hallBaseCamera = null;
+let hallToRoomCamera = null;
 let roomBaseCamera = null;
 let roomEnterCamera = null;
 let hoveredObject = null;
 const cameraMap = {};
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const timer = new THREE.Timer();
+const movementTime = 1; // seconds
+
+const catalogEl = document.getElementById("catalog-overlay");
+const helpEl = document.getElementById("hover-help-box");
+const helpElTitle = document.getElementById("hover-help-name");
+const backButton = document.getElementById("view-back");
+const loadingScreen = document.getElementById("loading-screen");
+const fpsContainer = document.getElementById("fps");
 
 const translationMap = { // german
     "Library":  "Partheland-Bibliotheken",
@@ -41,42 +62,36 @@ const translationMap = { // german
     "Profile":  "Mein Konto",
     "Help":     "Chat & Hilfe",
     "Community":   "Veranstaltungen",
-}
+};
+
+const loadingManager = new THREE.LoadingManager();
+const hdrLoader = new HDRLoader(loadingManager);
+const gltfLoader = new GLTFLoader(loadingManager);
+gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
 
 const scene = new THREE.Scene();
-
 const width = window.innerWidth;
 const height = window.innerHeight;
 const camera = new THREE.PerspectiveCamera(40, width/height, 0.1, 1000);
-
-const catalogEl = document.getElementById("catalog-overlay");
 
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
     powerPrefrence: "high-performance",
     canvas: document.getElementById("game"),
 });
-
-// new OrbitControls(camera, renderer.domElement);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(width, height);
+renderer.setAnimationLoop(() => animate());
 
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(width, height);
-
+// post-processing
 const composer = new EffectComposer(renderer);
-
-// const ssaoPass = new SSAOPass(scene, camera, width/2, height/2);
-// ssaoPass.kernelRadius = 2;
-// ssaoPass.minDistance = 0.001;
-// ssaoPass.maxDistance = 0.1;
-//
-// const contrastPass = new ShaderPass(BrightnessContrastShader);
-// contrastPass.uniforms['contrast'].value = 0.08;
-// contrastPass.uniforms['brightness'].value = 0.0;
 
 const resolution = new THREE.Vector2(width, height);
 const outlinePass = new OutlinePass(resolution, scene, camera);
@@ -85,221 +100,15 @@ outlinePass.edgeThickness = 1;
 outlinePass.visibleEdgeColor.set('#FFFFFF');
 outlinePass.hiddenEdgeColor.set('#FFFFFF');
 
-const renderPass = new RenderPass(scene, camera);
-const outputPass = new OutputPass();
-
-// const fxaaPass = new ShaderPass(FXAAShader);
-
-// postprocessing passes
-composer.addPass(renderPass);
-// composer.addPass(contrastPass);
-// composer.addPass(ssaoPass);
+composer.addPass(new RenderPass(scene, camera));
 composer.addPass(outlinePass);
-// composer.addPass(fxaaPass);
-composer.addPass(outputPass);
+composer.addPass(new OutputPass());
 
-// HTML Overlay
-const helpEl = document.getElementById("hover-help-box");
-const helpElTitle = document.getElementById("hover-help-name");
-
-function showHelp(message) {
-
-    helpEl.style.left = ((mouse.x+1)/2)*window.innerWidth  + 'px';
-    helpEl.style.top = (1.0 - (mouse.y+1)/2)*window.innerHeight + 'px';
-
-    helpElTitle.innerText = message;
-    helpEl.style.opacity = '1';
-}
-
-function hideHelp() {
-    helpEl.style.opacity = '0';
-}
-
-const backButton = document.getElementById("view-back");
-let cameraAtHome = true;
-
-backButton.addEventListener('click', () => {
-    if (!activeModel) return;
-
-    if (isInRoom && cameraAtHome) {
-        exitRoom();
-    }
-
-    catalogEl.style.opacity = '0';
-    activeCameraTarget = {
-        position: isInRoom ? roomBaseCamera.position.clone() : hallBaseCamera.position.clone(),
-        quaternion: isInRoom ? roomBaseCamera.quaternion.clone() : hallBaseCamera.quaternion.clone(),
-        progress: 0,
-        opacity: '0',
-    };
-    cameraAtHome = true;
-});
-
-let lightHelper;
-function addDirectionalLight(scene, { 
-    color = 0xffffff,
-    intensity = 1,
-    position = { x: 0, y: 2, z: 0 },
-    target = { x: 0, y: 0, z: 0 }
-} = {}) {
-
-    const light = new THREE.DirectionalLight(color, intensity);
-
-    light.position.set(position.x, position.y, position.z);
-    light.target.position.set(target.x, target.y, target.z);
-
-    light.castShadow = true;
-    light.shadow.mapSize.set(1024, 1024);
-
-    const d = 10;
-    light.shadow.camera.left = -d;
-    light.shadow.camera.right = d;
-    light.shadow.camera.top = d;
-    light.shadow.camera.bottom = -d;
-
-    light.shadow.camera.near = 0.5;
-    light.shadow.camera.far = 50;
-
-    light.shadow.bias = -0.001;
-    scene.add(light);
-    scene.add(light.target);
-
-    // lightHelper = new THREE.DirectionalLightHelper(light, 1);
-    // scene.add(lightHelper);
-    // const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
-    // scene.add(shadowHelper);
-
-    return light;
-}
-
-// create light
-
-// GUI
-// const gui = new GUI();
-//
-
-// const lightFolder = gui.addFolder('Directional Light');
-//
-// // position controls
-// const pos = light.position;
-// lightFolder.add(pos, 'x', -20, 20, 0.1).name('pos x');
-// lightFolder.add(pos, 'y', -20, 20, 0.1).name('pos y');
-// lightFolder.add(pos, 'z', -20, 20, 0.1).name('pos z');
-//
-// // target controls
-// const target = light.target.position;
-// lightFolder.add(target, 'x', -20, 20, 0.1).name('target x');
-// lightFolder.add(target, 'y', -20, 20, 0.1).name('target y');
-// lightFolder.add(target, 'z', -20, 20, 0.1).name('target z');
-//
-// // intensity
-// lightFolder.add(light, 'intensity', 0, 20, 0.1);
-//
-// // color
-// const params = { color: light.color.getHex() };
-// lightFolder.addColor(params, 'color').onChange(v => {
-//     light.color.set(v);
-// });
-//
-// lightFolder.open();
-
-import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
-import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-
-RectAreaLightUniformsLib.init();
-
-function addAreaLight(scene, {
-    color = 0xffffff,
-    intensity = 5,
-    width = 2,
-    height = 2,
-    position = { x: 0, y: 3, z: 0 },
-    rotation = { x: 0, y: 0, z: 0 }
-} = {}) {
-
-    const light = new THREE.RectAreaLight(color, intensity, width, height);
-
-    light.position.set(position.x, position.y, position.z);
-    light.rotation.set(rotation.x, rotation.y, rotation.z);
-
-    scene.add(light);
-
-    // helper (visual rectangle)
-    const helper = new RectAreaLightHelper(light);
-    light.add(helper); // attach so it moves with light
-
-    return { light, helper };
-}
-
-const HdrPath = `${BASE}/hdri/park_1k.hdr`;
-const HallModelPath = `${BASE}/models/hall.glb`;
-const RoomoModelPath = `${BASE}/models/room.glb`;
-
-const loadingManager = new THREE.LoadingManager();
-const loadingScreen = document.getElementById("loading-screen");
-
-const loader = new GLTFLoader();
-loader.setMeshoptDecoder(MeshoptDecoder);
-
-loadingManager.onLoad = () => {
-    loadingScreen.style.opacity = '0';
-
-    loader.load(RoomoModelPath, (glb) => {
-        roomModel = glb.scene;
-        addDirectionalLight(roomModel, { 
-            color: "white",
-            intensity: 5,
-            position: { x: -15, y: 6.7, z: 8 },
-            target: { x: -15, y: 0, z: 8 },
-        });
-        addDirectionalLight(roomModel, { 
-            color: "orange",
-            intensity: 8,
-            position: { x: -15, y: 6.7, z: 20 },
-            target: { x: -15, y: 0, z: 4.5 },
-        });
-
-
-        roomModel.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-
-            if (child.isCamera) {
-                if (child.name === 'Base_Camera') {
-                    roomBaseCamera = child; 
-                } 
-                if (child.name === 'RoomEnterCamera') {
-                    roomEnterCamera = child;
-                }
-                else if (child.name.endsWith('_Camera')) {
-                    let meshName = child.name.replace('_Camera', '');
-                    const meshTranslation = translationMap[meshName];
-
-                    if (meshTranslation) {
-                        const obj = roomModel.getObjectByName(meshName);
-                        obj.name = meshTranslation;
-                    }
-
-                    cameraMap[meshTranslation] = child;
-                }
-            }
-        });
-
-        if (isInRoom) enterRoom();
-    });
-};
-
-new HDRLoader(loadingManager).load(HdrPath, (texture) => {
+hdrLoader.load(HdrPath, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = texture;
     scene.environmentIntensity = 1.0;
-    // scene.backgroundRotation.set(0, Math.PI / 2, 0); 
 });
-
-const gltfLoader = new GLTFLoader(loadingManager);
-gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
 gltfLoader.load(HallModelPath, (gltf) => {
     hallModel = gltf.scene;
@@ -324,6 +133,14 @@ gltfLoader.load(HallModelPath, (gltf) => {
         width: 10,
         height: 4,
         position: { x: 0, y: 2.4, z: 4.5 },
+        rotation: {x: 0, y: 0, z: 0}
+    });
+    addAreaLight(hallModel, {
+        color: 0xffffff,
+        intensity: 3,
+        width: 10,
+        height: 4,
+        position: { x: 0, y: 2.4, z: -10.5 },
         rotation: {x: 0, y: 0, z: 0}
     });
 
@@ -356,45 +173,139 @@ gltfLoader.load(HallModelPath, (gltf) => {
     });
 });
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+loadingManager.onLoad = () => {
+    loadingScreen.style.opacity = '0';
 
-window.addEventListener('mousemove', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-});
+    loader.load(RoomoModelPath, (glb) => {
+        roomModel = glb.scene;
+        addDirectionalLight(roomModel, { 
+            color: "white",
+            intensity: 5,
+            position: { x: -15, y: 6.7, z: 8 },
+            target: { x: -15, y: 0, z: 8 },
+        });
+        addDirectionalLight(roomModel, { 
+            color: "orange",
+            intensity: 8,
+            position: { x: -15, y: 6.7, z: 20 },
+            target: { x: -15, y: 0, z: 4.5 },
+        });
+        addAreaLight(roomModel, {
+            color: 0xffffff,
+            intensity: 50,
+            width: 20,
+            height: 20,
+            position: { x: -20, y: 3, z: 30 },
+            rotation: {x: 0, y: Math.PI, z: 0}
+        });
 
-window.addEventListener('click', () => {
-    if (!hoveredObject) return;
 
-    const targetCam = cameraMap[hoveredObject.name];
-    if (!targetCam) return;
 
-    activeCameraTarget = {
-        position: targetCam.position.clone(),
-        quaternion: targetCam.quaternion.clone(),
-        progress: 0,
-        opacity: '1',
-        name: hoveredObject.name,
-    };
+        roomModel.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
 
-    if (isInRoom) cameraAtHome = false;
-});
+            if (child.isCamera) {
+                if (child.name === 'Base_Camera') {
+                    roomBaseCamera = child; 
+                } 
+                if (child.name === 'RoomEnterCamera') {
+                    roomEnterCamera = child;
+                }
+                else if (child.name.endsWith('_Camera')) {
+                    let meshName = child.name.replace('_Camera', '');
+                    const meshTranslation = translationMap[meshName];
 
-let isInRoom = false;
-let justExitedRoom = false;
-let roomModelLoaded = false;
+                    if (meshTranslation) {
+                        const obj = roomModel.getObjectByName(meshName);
+                        obj.name = meshTranslation;
+                    }
+                    cameraMap[meshTranslation] = child;
+                }
+            }
+        });
 
-function enterRoom() {
-    isInRoom = true;
-    justExitedRoom = false;
-    backButton.style.opacity = '1';
+        if (state == States.ROOM_HOME) enterRoom();
+    });
+};
+
+const showHelp = (message) => {
+    helpEl.style.left = ((mouse.x+1)/2)*window.innerWidth  + 'px';
+    helpEl.style.top = (1.0 - (mouse.y+1)/2)*window.innerHeight + 'px';
+
+    helpElTitle.innerText = message;
+    helpEl.style.opacity = '1';
+}
+
+const hideHelp = () => {
+    helpEl.style.opacity = '0';
+}
+
+function addDirectionalLight(scene, { 
+    color = 0xffffff,
+    intensity = 1,
+    position = { x: 0, y: 2, z: 0 },
+    target = { x: 0, y: 0, z: 0 }
+} = {}) {
+
+    const light = new THREE.DirectionalLight(color, intensity);
+
+    light.position.set(position.x, position.y, position.z);
+    light.target.position.set(target.x, target.y, target.z);
+
+    light.castShadow = true;
+    light.shadow.mapSize.set(1024, 1024);
+
+    const d = 10;
+    light.shadow.camera.left = -d;
+    light.shadow.camera.right = d;
+    light.shadow.camera.top = d;
+    light.shadow.camera.bottom = -d;
+
+    light.shadow.camera.near = 0.5;
+    light.shadow.camera.far = 50;
+
+    light.shadow.bias = -0.001;
+    scene.add(light);
+    scene.add(light.target);
+
+    return light;
+}
+
+RectAreaLightUniformsLib.init();
+function addAreaLight(scene, {
+    color = 0xffffff,
+    intensity = 5,
+    width = 2,
+    height = 2,
+    position = { x: 0, y: 3, z: 0 },
+    rotation = { x: 0, y: 0, z: 0 }
+} = {}) {
+
+    const light = new THREE.RectAreaLight(color, intensity, width, height);
+
+    light.position.set(position.x, position.y, position.z);
+    light.rotation.set(rotation.x, rotation.y, rotation.z);
+
+    scene.add(light);
+
+    const helper = new RectAreaLightHelper(light);
+    light.add(helper);
+
+    return { light, helper };
+}
+
+
+const enterRoom = () => {
 
     if (!roomModel) {
         loadingScreen.style.opacity = '1';
         return;
     }  
 
+    backButton.style.opacity = '1';
     loadingScreen.style.opacity = '0';
     activeModel = roomModel;
 
@@ -404,20 +315,21 @@ function enterRoom() {
     camera.position.copy(roomEnterCamera.position);
     camera.quaternion.copy(roomEnterCamera.quaternion);
 
-    activeCameraTarget = {
+    cameraTarget = {
         position: roomBaseCamera.position.clone(),
         quaternion: roomBaseCamera.quaternion.clone(),
         progress: 0,
+        onComplete: () => {
+            cameraTarget = null;
+        }
     }
 }
 
-function exitRoom() {
+const exitRoom = () => {
+
     backButton.style.opacity = '0';
-    isInRoom = false;
-    justExitedRoom = true;
 
     activeModel = hallModel;
-
     scene.remove(roomModel);
     scene.add(hallModel);
 
@@ -425,31 +337,47 @@ function exitRoom() {
     camera.quaternion.copy(hallToRoomCamera.quaternion);
     hallToRoomCamera = null;
 
-    activeCameraTarget = {
+    cameraTarget = {
         position: hallBaseCamera.position.clone(),
         quaternion: hallBaseCamera.quaternion.clone(),
         progress: 0,
-        opacity: '1',
+        onComplete: () => {
+            cameraTarget = null;
+        }
     };
-
-    setTimeout(() => {
-        justExitedRoom = false;
-    }, movementTime*1000*2);
 }
 
-let fpsContainer = document.getElementById("fps");
-const timer = new THREE.Timer();
+function clearHover() {
+    document.body.style.cursor = 'auto';
+    hoveredObject = null;
+    outlinePass.selectedObjects = [];
+    hideHelp();
+}
+
+const handleHover = (obj) => {
+
+    let tempName = obj.name;
+    if (!cameraMap[obj.name]) {
+        if (!cameraMap[obj.parent.name]) {
+            clearHover();
+            return;
+        } else {
+            tempName = obj.parent.name;
+        }
+    }
+
+    hoveredObject = obj;
+    outlinePass.selectedObjects = [obj];
+    showHelp(tempName);
+    document.body.style.cursor = 'pointer';
+}
 
 let frameCount = 0;
 let elapsedTime = 0;
 let lastRaycast = 0;
 let intersects;
 
-const movementTime = 1; // seconds
-
-function animate() {
-    requestAnimationFrame(animate);
-
+const animate = () => {
     { // FPS
         timer.update();
         const delta = timer.getDelta();
@@ -468,85 +396,115 @@ function animate() {
         }
     }
 
-    if (!activeModel) return;
+    { // raycasting
+        if (!activeModel) return;
 
-    const now = performance.now();
-    if (now - lastRaycast > 100) { // every 100ms
-        raycaster.setFromCamera(mouse, camera);
-        intersects = raycaster.intersectObjects(activeModel.children, true);
-        lastRaycast = now;
-    }
-
-    if (intersects.length > 0) {
-        let obj = intersects[0].object;
-
-        while (obj && !cameraMap[obj.name]) {
-            obj = obj.parent;
+        const now = performance.now();
+        if (now - lastRaycast > 100) { // every 100ms
+            raycaster.setFromCamera(mouse, camera);
+            intersects = raycaster.intersectObjects(activeModel.children, true);
+            lastRaycast = now;
         }
 
-        if (obj && cameraMap[obj.name]) {
-            hoveredObject = obj;
-
-            outlinePass.selectedObjects = [obj];
-            showHelp(obj.name);
-            document.body.style.cursor = 'pointer';
+        if (intersects.length > 0) {
+            handleHover(intersects[0].object);
         } else {
-            document.body.style.cursor = 'auto';
             clearHover();
         }
-    } else {
-        clearHover();
     }
 
-    if (activeCameraTarget) {
-        activeCameraTarget.progress += timer.getDelta() * 1/movementTime;
+    { // camera movement
+        if (cameraTarget) {
 
-        camera.position.lerp(
-            activeCameraTarget.position,
-            activeCameraTarget.progress
-        );
+            cameraTarget.progress += timer.getDelta() * 1/movementTime;
 
-        camera.quaternion.slerp(
-            activeCameraTarget.quaternion,
-            activeCameraTarget.progress
-        );
+            camera.position.lerp(
+                cameraTarget.position,
+                cameraTarget.progress
+            );
+            camera.quaternion.slerp(
+                cameraTarget.quaternion,
+                cameraTarget.progress
+            );
 
-        if (activeCameraTarget.progress >= 1) {
-
-            if (!isInRoom && !justExitedRoom) {
-                hallToRoomCamera = { 
-                    position: activeCameraTarget.position.clone(),
-                    quaternion:  activeCameraTarget.quaternion.clone(), 
-                };
-                activeCameraTarget = null;
-                enterRoom();
-            } else {
-                if (activeCameraTarget.name == translationMap['Catalog']) {
-                    catalogEl.style.opacity = activeCameraTarget.opacity;
-                    if (activeCameraTarget.opacity != '0') {
-                        catalogEl.style.pointerEvents = 'auto';
-                    } else {
-                        catalogEl.style.pointerEvents = 'none';
-                    }
-                }
-                activeCameraTarget = null;
+            if (cameraTarget.progress >= 1) {
+                cameraTarget.onComplete();
             }
-
         }
     }
-
-    if (lightHelper) lightHelper.update();
 
     composer.render();
 }
 
-function clearHover() {
-    hoveredObject = null;
-    outlinePass.selectedObjects = [];
-    hideHelp();
+// event listeners
+window.addEventListener('mousemove', (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+});
+
+const showPopup = (itemName) => {
+    if (itemName == translationMap['Catalog']) {
+        catalogEl.style.opacity = '1';
+    }
+}
+const hidePopup = () => {
+    catalogEl.style.opacity = '0';
 }
 
-animate();
+const handleClick = () => {
+    if (!hoveredObject) return;
+
+    switch(state) {
+        case States.HALL_HOME: {
+
+            const targetCam = cameraMap[hoveredObject.name];
+            hallToRoomCamera = targetCam;
+
+            if (!targetCam) {
+                console.error(`${hoveredObject.name} item does not have a camera`);
+                return;
+            }
+
+            state = States.ROOM_HOME;
+
+            cameraTarget = {
+                position: targetCam.position.clone(),
+                quaternion: targetCam.quaternion.clone(),
+                progress: 0,
+                onComplete: () => {
+                    enterRoom();
+                }
+            };
+        } break;
+
+        case States.ROOM_HOME: {
+
+            const targetCam = cameraMap[hoveredObject.name];
+            if (!targetCam) {
+                console.error(`${hoveredObject.name} item does not have a camera`);
+                return;
+            }
+
+            const itemName = hoveredObject.name;
+
+            cameraTarget = {
+                position: targetCam.position.clone(),
+                quaternion: targetCam.quaternion.clone(),
+                progress: 0,
+                onComplete: () => { 
+                    showPopup(itemName);
+                    state = States.ROOM_ITEM;
+                }
+            };
+        } break;
+
+        default: {
+            console.log("Unhandled state", state);
+        } break;
+    }
+}
+
+window.addEventListener('click', handleClick);
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -555,3 +513,41 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
 });
+
+const handleBack = () => {
+    switch(state) {
+        case States.ROOM_ITEM: {
+            hidePopup();
+            state = States.ROOM_HOME;
+
+            cameraTarget = {
+                position: roomBaseCamera.position.clone(),
+                quaternion: roomBaseCamera.quaternion.clone(),
+                progress: 0,
+                onComplete: () => {
+                    console.log("back at home");
+                    cameraTarget = null;
+                }
+            }
+        } break;
+
+        case States.ROOM_HOME: {
+            cameraTarget = {
+                position: roomEnterCamera.position.clone(),
+                quaternion: roomEnterCamera.quaternion.clone(),
+                progress: 0,
+                onComplete: () => {
+                    state = States.HALL_HOME;
+                    exitRoom();
+                }
+            }
+
+        } break;
+
+        default: {
+            console.error("Unhandled state ", state);
+        } break;
+    }
+} 
+
+backButton.addEventListener('click', handleBack);
