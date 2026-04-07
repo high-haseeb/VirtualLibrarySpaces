@@ -9,11 +9,13 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
-import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+// import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+// import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+// import { BrightnessContrastShader } from 'three/addons/shaders/BrightnessContrastShader.js';
+// import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 
+// import GUI from "three/examples/jsm/libs/lil-gui.module.min.js"
+// import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const BASE = import.meta.env.BASE_URL;
 let activeModel = null;
@@ -52,14 +54,14 @@ renderer.setSize(width, height);
 
 const composer = new EffectComposer(renderer);
 
-const ssaoPass = new SSAOPass(scene, camera, width/2, height/2);
-ssaoPass.kernelRadius = 2;
-ssaoPass.minDistance = 0.001;
-ssaoPass.maxDistance = 0.1;
-
-const contrastPass = new ShaderPass(BrightnessContrastShader);
-contrastPass.uniforms['contrast'].value = 0.06;
-contrastPass.uniforms['brightness'].value = 0.0;
+// const ssaoPass = new SSAOPass(scene, camera, width/2, height/2);
+// ssaoPass.kernelRadius = 2;
+// ssaoPass.minDistance = 0.001;
+// ssaoPass.maxDistance = 0.1;
+//
+// const contrastPass = new ShaderPass(BrightnessContrastShader);
+// contrastPass.uniforms['contrast'].value = 0.08;
+// contrastPass.uniforms['brightness'].value = 0.0;
 
 const resolution = new THREE.Vector2(width, height);
 const outlinePass = new OutlinePass(resolution, scene, camera);
@@ -75,8 +77,8 @@ const fxaaPass = new ShaderPass(FXAAShader);
 
 // postprocessing passes
 composer.addPass(renderPass);
-composer.addPass(contrastPass);
-composer.addPass(ssaoPass);
+// composer.addPass(contrastPass);
+// composer.addPass(ssaoPass);
 composer.addPass(outlinePass);
 // composer.addPass(fxaaPass);
 composer.addPass(outputPass);
@@ -442,47 +444,3 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
 });
-
-
-// window.addEventListener('beforeunload', cleanup);
-function cleanup() {
-    cancelAnimationFrame(animationId);
-
-    disposeScene(scene);
-
-    composer.dispose();
-    ssaoPass.dispose();
-    fxaaPass.dispose();
-    outlinePass.dispose();
-    contrastPass.dispose();
-
-    renderer.dispose();
-    renderer.forceContextLoss();
-
-    window.removeEventListener('mousemove', onMouseMove);
-    window.removeEventListener('click', onClick);
-    window.removeEventListener('resize', onResize);
-}
-function disposeScene(scene) {
-    scene.traverse((obj) => {
-        if (obj.isMesh) {
-            obj.geometry?.dispose();
-
-            if (Array.isArray(obj.material)) {
-                obj.material.forEach(mat => disposeMaterial(mat));
-            } else {
-                disposeMaterial(obj.material);
-            }
-        }
-    });
-}
-
-function disposeMaterial(material) {
-    for (const key in material) {
-        const value = material[key];
-        if (value && value.isTexture) {
-            value.dispose();
-        }
-    }
-    material.dispose();
-}
